@@ -1,0 +1,79 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                          Price Move Robot.mq5    |
+//|                                      Copyright © 2022, forexroboteasy.com |
+//|                                               Forex Robot Easy Team |
+//+------------------------------------------------------------------+
+
+//--- Define input parameters
+input double StopLossPercent = 5; // Stop loss percentage
+input int PeriodRSI = 14; // RSI period
+input int TrailingStop = 20; // Trailing stop level
+
+//--- Define global variables
+double stopLossLevel; // Stop loss level
+double takeProfitLevel; // Take profit level
+int ticket; // Trade ticket number
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    // Calculate stop loss and take profit levels based on StopLossPercent
+    stopLossLevel = NormalizeDouble((Ask - (Ask * StopLossPercent / 100)), Digits);
+    takeProfitLevel = NormalizeDouble((Ask + (Ask * StopLossPercent / 100)), Digits);
+    
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // Check if there is an existing trade
+    if(ticket == 0)
+    {
+        // Check if RSI is below 30 indicating oversold condition
+        if(iRSI(Symbol(), 0, PeriodRSI, PRICE_CLOSE, 0) < 30)
+        {
+            // Open a buy trade
+            ticket = OrderSend(Symbol(), OP_BUY, 0.01, Ask, 3, stopLossLevel, takeProfitLevel, 'Price Move Robot', 0, 0, clrGreen);
+        }
+        // Check if RSI is above 70 indicating overbought condition
+        else if(iRSI(Symbol(), 0, PeriodRSI, PRICE_CLOSE, 0) > 70)
+        {
+            // Open a sell trade
+            ticket = OrderSend(Symbol(), OP_SELL, 0.01, Bid, 3, stopLossLevel, takeProfitLevel, 'Price Move Robot', 0, 0, clrRed);
+        }
+    }
+    else
+    {
+        // Check if the current trade is in profit
+        if(OrderProfit(ticket) > TrailingStop * Point)
+        {
+            // Set the trailing stop level
+            double newStopLoss = NormalizeDouble((Ask - TrailingStop * Point), Digits);
+            OrderModify(ticket, OrderOpenPrice(), newStopLoss, OrderTakeProfit(), 0, clrBlue);
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+    // Close the existing trade
+    if(ticket > 0)
+        OrderClose(ticket, OrderLots(), Bid, 3, clrRed);
+}
+
+//+------------------------------------------------------------------+
+//| Custom functions                                                 |
+//+------------------------------------------------------------------+
+double NormalizeDouble(double value, int digits)
+{
+    return(MathRound(value * MathPow(10, digits)) / MathPow(10, digits));
+}
